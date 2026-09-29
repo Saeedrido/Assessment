@@ -1,0 +1,747 @@
+{
+  "info": {
+    "name": "T-World Module Service",
+    "description": "Content, AI summarisation, token economy, media and user APIs.\n\n## Getting started\n\n1. Start the API: `npm run dev:backend` (listens on port 4000, prefix `/api/v1`).\n2. Seed the database: `npm run seed` \u2014 it prints the `x-user-id` values to use.\n3. Set the `userId` collection variable to one of those ids. It is sent as the\n   `x-user-id` header by every request in this collection.\n\n## Authentication\n\nThis build uses a development identity header. `x-user-id` is only honoured\nwhen `AUTH_DEV_ENABLED=true`, `NODE_ENV` is not `production`, and the request\ncomes from a loopback address. In production the middleware is disabled, so\nreplace it with a real token verifier before deploying.\n\n## Response envelope\n\nSuccess: `{ \"success\": true, \"message\": string, \"data\": ... }`, plus `meta` on\npaginated list endpoints. List endpoints accept `page` and `pageSize`.\n\nError: `{ \"success\": false, \"errorCode\": string, \"message\": string, \"details\"?: ... }`\n\nError codes are stable strings (`VALIDATION_ERROR`, `AI_CONTENT_NOT_FOUND`,\n`TOKENS_INSUFFICIENT_BALANCE`, ...).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000"
+    },
+    {
+      "key": "apiPrefix",
+      "value": "/api/v1"
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "contentId",
+      "value": ""
+    },
+    {
+      "key": "mediaId",
+      "value": ""
+    },
+    {
+      "key": "aiRunId",
+      "value": ""
+    },
+    {
+      "key": "conversionId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}{{apiPrefix}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "{{apiPrefix}}",
+            "health"
+          ]
+        },
+        "description": "Liveness probe. Requires no identity."
+      }
+    },
+    {
+      "name": "Content",
+      "item": [
+        {
+          "name": "List content",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/content?page=1&pageSize=10&q=&tag=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "content"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "10"
+                },
+                {
+                  "key": "q",
+                  "value": "",
+                  "description": "Full-text search over title and body. Leave empty to omit."
+                },
+                {
+                  "key": "tag",
+                  "value": "",
+                  "description": "Repeatable. Filters by tag."
+                }
+              ]
+            },
+            "description": "Paginated, full-text searchable content list."
+          }
+        },
+        {
+          "name": "Get content by id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/content/{{contentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "content",
+                "{{contentId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create content (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"How token rewards incentivise content\",\n  \"body\": \"Token rewards tie creator compensation to measurable activity. Each successful AI run credits the creator.\",\n  \"tags\": [\"tokens\", \"rewards\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/content",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "content"
+              ]
+            },
+            "description": "Requires the `admin` role; a normal user receives 403. Saves the returned `data.id` into the `contentId` variable via the test script."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.success && body.data && body.data.id) {",
+                  "  pm.collectionVariables.set('contentId', body.data.id);",
+                  "  console.log('Saved contentId =', body.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AI",
+      "item": [
+        {
+          "name": "Summarise content",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tone\": \"neutral\",\n  \"length\": \"short\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/content/{{contentId}}/ai/summarize",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "content",
+                "{{contentId}}",
+                "ai",
+                "summarize"
+              ]
+            },
+            "description": "Charges AI_REQUEST_COST (default 1) up front and pays AI_SUCCESS_REWARD (default 5) on success.\n\n`tone`: neutral | friendly | formal | concise\n`length`: short | medium | long\n\nSuccess data is `{ output, latencyMs, tokensAwarded, totalTokenBalance, run }`.\nA failed run answers 502 (provider error) or 504 (timeout) with `errorCode`, and the cost is refunded in full. An unaffordable request answers 422 `TOKENS_INSUFFICIENT_BALANCE` before the provider is called.\n\nThe test script stores the run id in `aiRunId`."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.success && body.data && body.data.run) {",
+                  "  pm.collectionVariables.set('aiRunId', body.data.run.id);",
+                  "  console.log('Saved aiRunId =', body.data.run.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "AI runs for content",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/content/{{contentId}}/ai/runs?page=1&pageSize=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "content",
+                "{{contentId}}",
+                "ai",
+                "runs"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "AI runs across all content",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/ai/runs?page=1&pageSize=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "ai",
+                "runs"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Run history across every content item for the signed-in user, newest first."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tokens",
+      "item": [
+        {
+          "name": "Balance",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/tokens/balance",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "tokens",
+                "balance"
+              ]
+            },
+            "description": "Returns `balance`, `earned`, `converted` and `withdrawn`."
+          }
+        },
+        {
+          "name": "Ledger history",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/tokens/history?page=1&pageSize=20&type=",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "tokens",
+                "history"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                },
+                {
+                  "key": "type",
+                  "value": "",
+                  "description": "EARN | SPEND | CONVERT | WITHDRAW"
+                }
+              ]
+            },
+            "description": "Append-only ledger. Every row satisfies `balanceAfter = balanceBefore + amount`, so the chain can be reconciled by an auditor."
+          }
+        },
+        {
+          "name": "Convert tokens",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"toAsset\": \"MOCK_USDT\",\n  \"amount\": 100\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/tokens/convert",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "tokens",
+                "convert"
+              ]
+            },
+            "description": "100 tokens -> 1 MOCK_USDT, 20 000 -> 1 MOCK_ETH. The debit and the ledger entry share a transaction.\n\nData is `{ txHashMock, convertedAmount, totalTokenBalance, conversion }` \u2014 the new record is `data.conversion`.\n\nThe test script saves `data.conversion.id` into the `conversionId` variable used by Withdraw."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.success && body.data && body.data.conversion) {",
+                  "  pm.collectionVariables.set('conversionId', body.data.conversion.id);",
+                  "  console.log('Saved conversionId =', body.data.conversion.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Withdraw",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"conversionId\": \"{{conversionId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/tokens/withdraw",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "tokens",
+                "withdraw"
+              ]
+            },
+            "description": "Moves the tokens of an existing conversion to its address. The status claim is atomic (SUCCESS -> PROCESSING -> WITHDRAWN), so a repeated request cannot double-send.\n\nRun \"Convert tokens\" first: its test script saves the id into the `conversionId` variable."
+          }
+        },
+        {
+          "name": "List conversions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/tokens/conversions?page=1&pageSize=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "tokens",
+                "conversions"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Media",
+      "item": [
+        {
+          "name": "Upload (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "JPEG, PNG, WebP, GIF, PDF, text or MP4, up to the configured size limit. The asset lands in the staging provider as STAGED.\n\nThe test script saves the id into the `mediaId` variable, which the other three media requests use."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/media/upload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "media",
+                "upload"
+              ]
+            },
+            "description": "Requires the `admin` role. multipart/form-data with a single `file` field. The asset lands in the staging provider with status STAGED; promote it to move it into permanent storage.\n\nThe test script stores the media id in the `mediaId` variable."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const body = pm.response.json();",
+                  "if (body.success && body.data && body.data.id) {",
+                  "  pm.collectionVariables.set('mediaId', body.data.id);",
+                  "  console.log('Saved mediaId =', body.data.id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List media",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/media?page=1&pageSize=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "media"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get media",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/media/{{mediaId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "media",
+                "{{mediaId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Promote media (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/media/{{mediaId}}/promote",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "media",
+                "{{mediaId}}",
+                "promote"
+              ]
+            },
+            "description": "Copies the staged asset into permanent storage, then removes the staged copy. Repeating the call is safe: the status transition is idempotent and the already-promoted asset is not copied twice."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Current user",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/users/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List users (admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/users?page=1&pageSize=20",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "users"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "pageSize",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get user (admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/users/{{userId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "users",
+                "{{userId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Web3",
+      "item": [
+        {
+          "name": "Verify signature",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-user-id",
+                "value": "{{userId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expectedAddress\": \"0x0000000000000000000000000000000000000001\",\n  \"message\": \"Sign in to T-World\",\n  \"signature\": \"0xdeadbeef\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}{{apiPrefix}}/web3/verify-signature",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "{{apiPrefix}}",
+                "web3",
+                "verify-signature"
+              ]
+            },
+            "description": "Confirms that `signature` was produced by `expectedAddress` over `message`, which is what binds the call to a wallet the user controls. Verification is read-only, so an invalid signature is reported as `valid: false` in a 200 response rather than an HTTP error.\n\nThe provider defaults to a mock that always verifies, which is what WEB3_PROVIDER=mock means in development."
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Fail fast with a helpful message rather than sending a request the",
+          "// API will answer 401.",
+          "if (!pm.collectionVariables.get('userId')) {",
+          "  throw new Error('Set the collection variable `userId` first: run `npm run seed` and copy one of the printed ids.');",
+          "}"
+        ]
+      }
+    }
+  ]
+}
